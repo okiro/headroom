@@ -4,7 +4,7 @@
 
 cd macos-app
 xcodegen generate  # regenerate the Xcode project (after adding/removing files or editing project.yml)
-open ClaudeUsageTray.xcodeproj
+open Headroom.xcodeproj
 ./build.sh         # Developer ID-signed universal release in macos-app/dist/
 ./release.sh       # notarized DMG + Sparkle appcast in dist/; --publish creates the GitHub release (CI does this on every push to main)
 
@@ -29,17 +29,17 @@ Native menu bar app (no Dock icon, no main window): AppKit `NSStatusItem` + `NSP
 
 ## Gotchas
 
-- `ClaudeUsageTray.xcodeproj` is generated and git-ignored — edit `project.yml`, not the project
+- `Headroom.xcodeproj` is generated and git-ignored — edit `project.yml`, not the project
 - `Pricing.swift` must be updated manually when new Claude models launch. A model missing from it is billed at the fallback rate, and history keeps the inflated value (it only goes up) unless a history-version migration re-prices it
 - History uses high-water-mark merging — values only go up, never down. Bump `historyVersion` only with a migration: transcripts get deleted, so the history is the only record of older usage
-- Data lives in `~/Library/Application Support/Claude Usage Tray/`; on first launch it is seeded from the former Electron app's `claude-usage-tray/` directory
+- Data lives in `~/Library/Application Support/Headroom/`; on first launch it is copied from the pre-rename `Claude Usage Tray/` directory, or else seeded from the former Electron app's `claude-usage-tray/` directory
 - The OAuth token is never written to disk; only a `connected` flag in UserDefaults persists
 - Read Claude Code's keychain item through `/usr/bin/security`, not `SecItem` — the item trusts that tool, so there is no access prompt
 - The popover uses `.applicationDefined` behavior with its own dismissal, and opens with `activate(ignoringOtherApps:)` — the cooperative `activate()` leaves the app inactive after a menu bar click
 - Releases are versioned from commit messages since the last `v*` tag (`feat:` → minor, `feat!:` → major, anything else → patch); every push to main touching `macos-app/` publishes one
 - Sparkle compares `CFBundleVersion`, so `build.sh` sets both it and `MARKETING_VERSION` to the release version; the values in `project.yml` are only development defaults
 - `macos-app/Info.plist` holds only Sparkle keys and is merged into the generated plist; it shares Vigil's Sparkle EdDSA key (the login keychain's default `generate_keys` item)
-- The former Electron app used the same bundle ID (`com.claude.usage-tray`): quit an installed copy before launching this one
+- The bundle ID is `live.okirodev.headroom`. Before the rename it was `com.claude.usage-tray` (shared with the former Electron app); `CredentialStore` reads that defaults domain once to carry over the `connected` flag. Sparkle refuses updates whose bundle ID differs from the installed app's, so never change it again once a release has shipped
 
 ## Code Style
 

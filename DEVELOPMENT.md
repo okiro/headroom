@@ -1,4 +1,4 @@
-# Developing Claude Usage Tray
+# Developing Headroom
 
 Notes for building, releasing and understanding the app. Looking for the app? See the [README](README.md).
 
@@ -15,7 +15,7 @@ Notes for building, releasing and understanding the app. Looking for the app? Se
     ├── Info.plist           # Sparkle feed URL and public key (merged into the generated plist)
     ├── build.sh             # Signed release build
     ├── release.sh           # Notarized DMG + Sparkle appcast, optionally published
-    └── ClaudeUsageTray/     # Swift sources and asset catalog
+    └── Headroom/            # Swift sources and asset catalog
 ```
 
 ## Requirements
@@ -28,8 +28,8 @@ Notes for building, releasing and understanding the app. Looking for the app? Se
 
 ```bash
 cd macos-app
-xcodegen generate              # creates ClaudeUsageTray.xcodeproj
-open ClaudeUsageTray.xcodeproj # run from Xcode
+xcodegen generate       # creates Headroom.xcodeproj
+open Headroom.xcodeproj # run from Xcode
 ```
 
 ## Build
@@ -43,7 +43,7 @@ Produces a Developer ID-signed universal app in `macos-app/dist/` (git-ignored).
 
 ## Releases & Auto-Update
 
-Every push to `main` that changes `macos-app/` ships a new version: [the Release workflow](.github/workflows/release.yml) builds the app, notarizes `ClaudeUsageTray-<version>.dmg`, and publishes it as GitHub release `v<version>` with a [Sparkle](https://sparkle-project.org) `appcast.xml` and a copy named `ClaudeUsageTray.dmg` (the README's download link).
+Every push to `main` that changes `macos-app/` ships a new version: [the Release workflow](.github/workflows/release.yml) builds the app, notarizes `Headroom-<version>.dmg`, and publishes it as GitHub release `v<version>` with a [Sparkle](https://sparkle-project.org) `appcast.xml` and a copy named `Headroom.dmg` (the README's download link).
 
 The version comes from the commit messages since the last `v*` tag ([Conventional Commits](https://www.conventionalcommits.org)):
 

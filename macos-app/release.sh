@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds a signed, notarized dist/ClaudeUsageTray-<version>.dmg plus the Sparkle appcast for it.
-#   ./release.sh            dist/ClaudeUsageTray-<version>.dmg + dist/appcast.xml
+# Builds a signed, notarized dist/Headroom-<version>.dmg plus the Sparkle appcast for it.
+#   ./release.sh            dist/Headroom-<version>.dmg + dist/appcast.xml
 #   ./release.sh --publish  also creates GitHub release v<version> with both; installed copies update from it
 # CI (.github/workflows/release.yml) runs --publish on every push to main that changes the app.
 #
@@ -18,7 +18,7 @@ cd "$(dirname "$0")"
 PROFILE="${NOTARY_PROFILE:-claude-tray-notary}"
 IDENTITY="${SIGN_IDENTITY:-Developer ID Application}"
 TEAM_ID="W898QUYB63"
-APP="dist/Claude Usage Tray.app"
+APP="dist/Headroom.app"
 PUBLISH=0
 [[ "${1:-}" == "--publish" ]] && PUBLISH=1
 
@@ -41,12 +41,12 @@ fi
 echo "Releasing $VERSION (previous: $LAST_TAG)"
 
 VERSION="$VERSION" ./build.sh
-DMG="dist/ClaudeUsageTray-$VERSION.dmg"
+DMG="dist/Headroom-$VERSION.dmg"
 
 STAGE="$(mktemp -d)"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Claude Usage Tray $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "Headroom $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO "$DMG" >/dev/null
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 if [[ -n "${APPLE_ID:-}" ]]; then
@@ -73,9 +73,9 @@ cat > dist/appcast.xml <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
     <channel>
-        <title>Claude Usage Tray</title>
+        <title>Headroom</title>
         <item>
-            <title>Claude Usage Tray $VERSION</title>
+            <title>Headroom $VERSION</title>
             <pubDate>$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")</pubDate>
             <sparkle:version>$VERSION</sparkle:version>
             <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
@@ -87,17 +87,17 @@ cat > dist/appcast.xml <<XML
 </rss>
 XML
 
-# The same DMG under a fixed name, so the README can link releases/latest/download/ClaudeUsageTray.dmg.
-cp "$DMG" dist/ClaudeUsageTray.dmg
+# The same DMG under a fixed name, so the README can link releases/latest/download/Headroom.dmg.
+cp "$DMG" dist/Headroom.dmg
 
 # Tags HEAD, so the release fails unless the built commit is pushed.
-PUBLISH_CMD=(gh release create "v$VERSION" "$DMG" dist/ClaudeUsageTray.dmg dist/appcast.xml --repo "${REPO_URL#https://github.com/}"
-    --target "$(git rev-parse HEAD)" --title "Claude Usage Tray $VERSION" --generate-notes)
+PUBLISH_CMD=(gh release create "v$VERSION" "$DMG" dist/Headroom.dmg dist/appcast.xml --repo "${REPO_URL#https://github.com/}"
+    --target "$(git rev-parse HEAD)" --title "Headroom $VERSION" --generate-notes)
 
 echo
 if (( PUBLISH )); then
     "${PUBLISH_CMD[@]}"
-    echo "Published: installed copies of Claude Usage Tray will update to $VERSION."
+    echo "Published: installed copies of Headroom will update to $VERSION."
 else
     echo "Ready to share: $DMG"
     echo "Publish the update: ${PUBLISH_CMD[*]}"

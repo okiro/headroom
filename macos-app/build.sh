@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="Claude Usage Tray.app"
+APP="Headroom.app"
 IDENTITY="${SIGN_IDENTITY:-Developer ID Application}"
 LAST_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)
 VERSION="${VERSION:-${LAST_TAG#v}}"
@@ -12,7 +12,7 @@ VERSION="${VERSION:-${LAST_TAG#v}}"
 xcodegen generate --quiet
 rm -rf build dist
 # CFBundleVersion is what Sparkle compares with the appcast's sparkle:version, so both carry the version.
-xcodebuild -project ClaudeUsageTray.xcodeproj -scheme ClaudeUsageTray -configuration Release \
+xcodebuild -project Headroom.xcodeproj -scheme Headroom -configuration Release \
   -destination 'generic/platform=macOS' -derivedDataPath build -quiet \
   MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" build
 

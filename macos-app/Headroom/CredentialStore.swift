@@ -22,15 +22,19 @@ enum AuthError: LocalizedError {
 /// one thing persisted is whether the user chose to connect.
 actor CredentialStore {
     private static let connectedKey = "connected"
-    private static let log = Logger(subsystem: "com.claude.usage-tray", category: "auth")
+    private static let log = Logger(subsystem: "live.okirodev.headroom", category: "auth")
+    /// Bundle ID before the rename to Headroom, also used by the Electron build.
+    private static let previousBundleID = "com.claude.usage-tray"
 
     private var cached: Credentials?
 
     init() {
-        // First launch after the Electron build: stay connected if it was.
+        // First launch after the rename (new bundle ID, so new defaults) or after the
+        // Electron build: stay connected if the user was.
         let defaults = UserDefaults.standard
         if defaults.object(forKey: Self.connectedKey) == nil {
-            let wasConnected = FileManager.default.fileExists(atPath: Paths.legacyAuthFile.path(percentEncoded: false))
+            let wasConnected = UserDefaults(suiteName: Self.previousBundleID)?.object(forKey: Self.connectedKey) as? Bool
+                ?? FileManager.default.fileExists(atPath: Paths.legacyAuthFile.path(percentEncoded: false))
             defaults.set(wasConnected, forKey: Self.connectedKey)
         }
     }

@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="macos-app/ClaudeUsageTray/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="128" alt="Claude Usage Tray icon">
+  <img src="macos-app/Headroom/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="128" alt="Headroom icon">
 </p>
 
-<h1 align="center">Claude Usage Tray</h1>
+<h1 align="center">Headroom</h1>
 
 <p align="center">
   <b>Your Claude Code limits and spending, always one glance away in the menu bar.</b>
 </p>
 
 <p align="center">
-  <a href="https://github.com/okiro/claudeTray/releases/latest/download/ClaudeUsageTray.dmg">
+  <a href="https://github.com/okiro/headroom/releases/latest/download/Headroom.dmg">
     <img src="https://img.shields.io/badge/Download_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS" height="44">
   </a>
   <br>
@@ -20,11 +20,11 @@
 
 You're deep in a Claude Code session when it stops: you've hit your 5-hour limit, with no warning. Or you wonder how much this month's work would have cost at API prices, and there's no easy way to find out.
 
-Claude Usage Tray sits in your menu bar and answers both. It shows how much of your limit is used and when it resets, plus what your Claude Code usage costs.
+Headroom sits in your menu bar and answers both. It shows how much of your limit is used and when it resets, plus what your Claude Code usage costs.
 
 ## Features
 
-- **Limit at a glance.** A gauge and percentage in the menu bar show how much of your 5-hour limit you've used.
+- **Limit at a glance.** A little robot head in the menu bar fills up as you use your 5-hour limit, next to the percentage. When its antenna lights up, you have no headroom left.
 - **5-hour and 7-day limits.** Bars with countdowns to the next reset, the tokens you've used in each window, and overage when you're past the limit.
 - **What it costs.** Today, this month and all time, priced per model at API rates.
 - **Projects.** Your most recent projects and your most expensive ones, with tokens and cost for each.
@@ -34,11 +34,11 @@ Claude Usage Tray sits in your menu bar and answers both. It shows how much of y
 
 ## Get started
 
-1. **[Download Claude Usage Tray](https://github.com/okiro/claudeTray/releases/latest/download/ClaudeUsageTray.dmg)**, open the `.dmg` and drag the app into **Applications**.
-2. Open it. A gauge appears in your menu bar.
-3. Click the gauge and press **Connect to Claude Code** to show your usage limits. Costs and projects show up without connecting.
+1. **[Download Headroom](https://github.com/okiro/headroom/releases/latest/download/Headroom.dmg)**, open the `.dmg` and drag the app into **Applications**.
+2. Open it. A robot head appears in your menu bar.
+3. Click it and press **Connect to Claude Code** to show your usage limits. Costs and projects show up without connecting.
 
-Click the gauge for the dashboard; right-click for **Refresh**, **Check for Updates…**, **Update Automatically** and **Quit**.
+Click the robot for the dashboard; right-click for **Refresh**, **Check for Updates…**, **Update Automatically** and **Quit**.
 
 ## Questions
 
@@ -69,7 +69,7 @@ No. It only connects to Anthropic's API, for your usage limits, and to GitHub, o
 <details>
 <summary><b>How do I uninstall it?</b></summary>
 <br>
-Right-click the gauge, choose <b>Quit</b>, and drag the app from Applications to the Trash. Its saved history is in <code>~/Library/Application Support/Claude Usage Tray/</code>.
+Right-click the robot, choose <b>Quit</b>, and drag the app from Applications to the Trash. Its saved history is in <code>~/Library/Application Support/Headroom/</code>.
 </details>
 
 ---

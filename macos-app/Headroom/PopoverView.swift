@@ -47,7 +47,7 @@ struct PopoverView: View {
                 .frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text("Claude Code")
+                    Text("Headroom")
                         .font(.headline)
                     if !model.appVersion.isEmpty {
                         Text("v\(model.appVersion)")
@@ -55,7 +55,7 @@ struct PopoverView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                Text(model.plan.map { "\($0.capitalized) plan" } ?? "Usage monitor")
+                Text(model.plan.map { "Claude Code · \($0.capitalized) plan" } ?? "Claude Code usage")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

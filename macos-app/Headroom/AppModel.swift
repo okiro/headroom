@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import OSLog
 
-private let log = Logger(subsystem: "com.claude.usage-tray", category: "model")
+private let log = Logger(subsystem: "live.okirodev.headroom", category: "model")
 
 /// All dashboard state. The popover and the menu bar item observe it directly.
 @MainActor

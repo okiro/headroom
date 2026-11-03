@@ -1,6 +1,6 @@
-name: ClaudeUsageTray
+name: Headroom
 options:
-  bundleIdPrefix: com.claude
+  bundleIdPrefix: live.okirodev
   deploymentTarget:
     macOS: "14.0"
 settings:
@@ -8,7 +8,7 @@ settings:
     DEVELOPMENT_TEAM: W898QUYB63
     # Development defaults; build.sh sets both to the release version (Sparkle compares
     # CFBundleVersion with the appcast's sparkle:version)
-    MARKETING_VERSION: "2.0.2"
+    MARKETING_VERSION: "2.0.3"
     CURRENT_PROJECT_VERSION: "2.0.1"
     SWIFT_VERSION: "6.0"
 packages:
@@ -16,21 +16,21 @@ packages:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.10.0
 targets:
-  ClaudeUsageTray:
+  Headroom:
     type: application
     platform: macOS
     sources:
-      - path: ClaudeUsageTray
+      - path: Headroom
     dependencies:
       - package: Sparkle
     settings:
       base:
-        PRODUCT_NAME: Claude Usage Tray
-        PRODUCT_BUNDLE_IDENTIFIER: com.claude.usage-tray
+        PRODUCT_NAME: Headroom
+        PRODUCT_BUNDLE_IDENTIFIER: live.okirodev.headroom
         GENERATE_INFOPLIST_FILE: "YES"
         # Merged into the generated Info.plist: Sparkle's feed and public key
         INFOPLIST_FILE: Info.plist
-        INFOPLIST_KEY_CFBundleDisplayName: Claude Usage Tray
+        INFOPLIST_KEY_CFBundleDisplayName: Headroom
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_LSUIElement: "YES"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

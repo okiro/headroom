@@ -30,7 +30,7 @@ final class StatusItemController: NSObject {
             button.sendAction(on: [.leftMouseDown, .rightMouseDown])
             button.imagePosition = .imageLeft
             button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
-            button.toolTip = "Claude Code Usage"
+            button.toolTip = "Headroom — Claude Code usage"
         }
 
         NotificationCenter.default.addObserver(
