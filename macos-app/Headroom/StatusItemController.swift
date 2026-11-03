@@ -9,6 +9,7 @@ final class StatusItemController: NSObject {
     private let updater: Updater
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
+    private let presentation = PopoverPresentation()
     private var outsideClickMonitor: Any?
     private var escapeKeyMonitor: Any?
 
@@ -17,12 +18,19 @@ final class StatusItemController: NSObject {
         self.updater = updater
         super.init()
 
-        let content = NSHostingController(rootView: PopoverView(model: model, updater: updater))
+        let content = NSHostingController(rootView: PopoverView(model: model, updater: updater, presentation: presentation))
         content.sizingOptions = .preferredContentSize
         popover.contentViewController = content
         // Dismissal (outside click, app deactivation, Esc) is handled here so that a
         // click on the menu bar item itself always toggles the popover.
         popover.behavior = .applicationDefined
+        // The open animation made the popover feel slow to appear.
+        popover.animates = false
+        // Build and lay out the SwiftUI view now rather than on the first click,
+        // which otherwise took ~120 ms. Deferred so the menu bar item appears first.
+        Task { @MainActor [weak self] in
+            _ = self?.popover.contentViewController?.view.fittingSize
+        }
 
         if let button = statusItem.button {
             button.target = self
@@ -82,6 +90,8 @@ final class StatusItemController: NSObject {
         // resign-active notification to dismiss the popover on app switch.
         NSApp.activate(ignoringOtherApps: true)
         updater.holdsInstall = true
+        presentation.isShown = true
+        LoginItem.shared.refresh()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
         // The button clears its highlight when its click tracking ends, after this
@@ -111,6 +121,7 @@ final class StatusItemController: NSObject {
             popover.performClose(nil)
         }
         statusItem.button?.highlight(false)
+        presentation.isShown = false
         updater.holdsInstall = false
         if let outsideClickMonitor {
             NSEvent.removeMonitor(outsideClickMonitor)
@@ -134,7 +145,7 @@ final class StatusItemController: NSObject {
         autoUpdate.state = updater.updatesAutomatically ? .on : .off
         let openAtLogin = menu.addItem(withTitle: "Open at Login", action: #selector(toggleOpenAtLogin), keyEquivalent: "")
         openAtLogin.target = self
-        openAtLogin.state = LoginItem.isEnabled ? .on : .off
+        openAtLogin.state = LoginItem.shared.readNow() ? .on : .off
         menu.addItem(.separator())
         menu.addItem(withTitle: "Refresh", action: #selector(refreshFromMenu), keyEquivalent: "r").target = self
         menu.addItem(
@@ -162,7 +173,7 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func toggleOpenAtLogin() {
-        LoginItem.isEnabled.toggle()
+        LoginItem.shared.setEnabled(!LoginItem.shared.isEnabled)
     }
 
     @objc private func toggleConnection() {
@@ -174,4 +185,13 @@ final class StatusItemController: NSObject {
             }
         }
     }
+}
+
+/// Whether the popover is on screen. Its clocks tick only while it is: the hosting
+/// view stays alive when the popover closes, and a periodic TimelineView kept
+/// re-rendering it every second for as long as the app ran.
+@MainActor
+@Observable
+final class PopoverPresentation {
+    var isShown = false
 }

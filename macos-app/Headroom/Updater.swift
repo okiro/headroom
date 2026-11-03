@@ -35,11 +35,18 @@ final class Updater: NSObject, SPUUpdaterDelegate, @preconcurrency SPUStandardUs
         controller = SPUStandardUpdaterController(startingUpdater: started, updaterDelegate: self, userDriverDelegate: self)
     }
 
+    /// Backed by Sparkle, so observation is reported by hand: the popover re-renders
+    /// only when something it reads changes.
     var updatesAutomatically: Bool {
-        get { controller.updater.automaticallyChecksForUpdates && controller.updater.automaticallyDownloadsUpdates }
+        get {
+            access(keyPath: \.updatesAutomatically)
+            return controller.updater.automaticallyChecksForUpdates && controller.updater.automaticallyDownloadsUpdates
+        }
         set {
-            controller.updater.automaticallyChecksForUpdates = newValue
-            controller.updater.automaticallyDownloadsUpdates = newValue
+            withMutation(keyPath: \.updatesAutomatically) {
+                controller.updater.automaticallyChecksForUpdates = newValue
+                controller.updater.automaticallyDownloadsUpdates = newValue
+            }
         }
     }
 

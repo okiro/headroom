@@ -3,6 +3,7 @@ import SwiftUI
 struct PopoverView: View {
     let model: AppModel
     let updater: Updater
+    let presentation: PopoverPresentation
     @State private var showsErrors = false
     @AppStorage("showsTopProjects") private var showsTopProjects = false
     @AppStorage("popoverTab") private var tab = Tab.spend
@@ -12,13 +13,20 @@ struct PopoverView: View {
     }
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            content(now: context.date)
-        }
-        .frame(width: 320)
+        content
+            .frame(width: 320)
     }
 
-    private func content(now: Date) -> some View {
+    /// Re-renders `content` every second while the popover is shown, and never while
+    /// it is closed. Only the text that depends on the time goes in here, so the rest
+    /// of the popover renders only when the model changes.
+    private func ticking(@ViewBuilder _ content: @escaping (Date) -> some View) -> some View {
+        TimelineView(PopoverClock(isActive: presentation.isShown)) { context in
+            content(context.date)
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
                 .padding(.horizontal, 16)
@@ -29,11 +37,11 @@ struct PopoverView: View {
                     .padding(.bottom, 10)
             }
             Divider()
-            limits(now: now)
+            limits
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
             Divider()
-            tabs(now: now)
+            tabs
             if !model.errors.isEmpty {
                 Divider()
                 errorList
@@ -41,7 +49,7 @@ struct PopoverView: View {
                     .padding(.vertical, 8)
             }
             Divider()
-            footer(now: now)
+            footer
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
         }
@@ -96,26 +104,26 @@ struct PopoverView: View {
     // ─── Usage limits ───────────────────────────────────────────────────────────
 
     @ViewBuilder
-    private func limits(now: Date) -> some View {
+    private var limits: some View {
         if model.isConnected, model.rateLimitError == nil, let limits = model.rateLimits {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     sectionTitle(limits.fiveHourUtil == nil ? "7-day window" : "5-hour window")
                     Spacer()
-                    peakHours(now: now)
+                    ticking { now in peakHours(now: now) }
                 }
                 if let fiveHourUtil = limits.fiveHourUtil {
                     window(
                         utilization: fiveHourUtil, reset: limits.fiveHourReset,
-                        tokens: model.fiveHourTokens, name: "5-hour", now: now
+                        tokens: model.fiveHourTokens, name: "5-hour"
                     )
-                    sevenDay(limits, now: now)
+                    sevenDay(limits)
                         .padding(.top, 4)
                 } else {
                     // No 5-hour limit (Ultra): the 7-day window is the headline.
                     window(
                         utilization: limits.sevenDayUtil, reset: limits.sevenDayReset,
-                        tokens: model.sevenDayTokens, name: "7-day", now: now
+                        tokens: model.sevenDayTokens, name: "7-day"
                     )
                 }
                 if limits.overageUtil != 0 {
@@ -137,7 +145,7 @@ struct PopoverView: View {
                 HStack {
                     sectionTitle("Usage Limits")
                     Spacer()
-                    peakHours(now: now)
+                    ticking { now in peakHours(now: now) }
                 }
                 if !model.isConnected {
                     connectPrompt
@@ -151,7 +159,7 @@ struct PopoverView: View {
     }
 
     private func window(
-        utilization: Double, reset: Double?, tokens: WindowTokens?, name: String, now: Date
+        utilization: Double, reset: Double?, tokens: WindowTokens?, name: String
     ) -> some View {
         let left = Headroom(utilization: utilization)
         return VStack(alignment: .leading, spacing: 10) {
@@ -167,10 +175,12 @@ struct PopoverView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
-                    if let reset = Self.resetText(reset, now: now) {
-                        Text(reset)
-                            .font(.caption.weight(.medium))
-                            .monospacedDigit()
+                    ticking { now in
+                        if let reset = Self.resetText(reset, now: now) {
+                            Text(reset)
+                                .font(.caption.weight(.medium))
+                                .monospacedDigit()
+                        }
                     }
                     if let tokens = Format.tokens(tokens?.total) {
                         Text("\(tokens) tokens used")
@@ -184,12 +194,9 @@ struct PopoverView: View {
         }
     }
 
-    private func sevenDay(_ limits: RateLimits, now: Date) -> some View {
+    private func sevenDay(_ limits: RateLimits) -> some View {
         let left = Headroom(utilization: limits.sevenDayUtil)
-        let details = [
-            Format.tokens(model.sevenDayTokens?.total).map { "\($0) tokens used" },
-            Self.resetText(limits.sevenDayReset, now: now).map { $0.prefix(1).lowercased() + $0.dropFirst() },
-        ].compactMap { $0 }
+        let tokens = Format.tokens(model.sevenDayTokens?.total).map { "\($0) tokens used" }
         return VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline) {
                 sectionTitle("7-day window")
@@ -201,11 +208,17 @@ struct PopoverView: View {
             }
             HeadroomBar(headroom: left, height: 4)
                 .accessibilityLabel("\(left.percent) percent of the 7-day window left")
-            if !details.isEmpty {
-                Text(details.joined(separator: " · "))
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+            ticking { now in
+                let details = [
+                    tokens,
+                    Self.resetText(limits.sevenDayReset, now: now).map { $0.prefix(1).lowercased() + $0.dropFirst() },
+                ].compactMap { $0 }
+                if !details.isEmpty {
+                    Text(details.joined(separator: " · "))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -265,7 +278,7 @@ struct PopoverView: View {
 
     // ─── Spend and Projects tabs ────────────────────────────────────────────────
 
-    private func tabs(now: Date) -> some View {
+    private var tabs: some View {
         VStack(spacing: 12) {
             Picker("Show", selection: $tab) {
                 Text("Spend").tag(Tab.spend)
@@ -276,8 +289,8 @@ struct PopoverView: View {
             // Both tabs are laid out so the taller one sets the height and the popover
             // doesn't resize on every switch.
             ZStack(alignment: .top) {
-                tabContent(.spend) { spend(now: now) }
-                tabContent(.projects) { projects(now: now) }
+                tabContent(.spend) { spend }
+                tabContent(.projects) { projects }
             }
         }
         .padding(.horizontal, 16)
@@ -295,7 +308,7 @@ struct PopoverView: View {
 
     // ─── Spend ──────────────────────────────────────────────────────────────────
 
-    private func spend(now: Date) -> some View {
+    private var spend: some View {
         let totals = model.usage?.totals
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .bottom) {
@@ -307,7 +320,7 @@ struct PopoverView: View {
                 }
                 Spacer()
                 HStack(spacing: 14) {
-                    costColumn(now.formatted(.dateTime.month(.wide)), totals?.monthCost)
+                    ticking { now in costColumn(now.formatted(.dateTime.month(.wide)), totals?.monthCost) }
                     costColumn("All time", totals?.cost)
                 }
             }
@@ -336,7 +349,7 @@ struct PopoverView: View {
 
     // ─── Projects ───────────────────────────────────────────────────────────────
 
-    private func projects(now: Date) -> some View {
+    private var projects: some View {
         let projects = showsTopProjects ? model.usage?.topProjects : model.usage?.recentProjects
         let largest = projects?.map(\.cost).max() ?? 0
         return VStack(alignment: .leading, spacing: 6) {
@@ -357,8 +370,10 @@ struct PopoverView: View {
                 .fixedSize()
             }
             if let projects, !projects.isEmpty {
-                ForEach(projects) { project in
-                    ProjectRow(project: project, share: largest > 0 ? project.cost / largest : 0, showsTop: showsTopProjects, now: now)
+                ticking { now in
+                    ForEach(projects) { project in
+                        ProjectRow(project: project, share: largest > 0 ? project.cost / largest : 0, showsTop: showsTopProjects, now: now)
+                    }
                 }
             } else {
                 message(Text(model.usage == nil ? "—" : "No projects found"))
@@ -407,7 +422,7 @@ struct PopoverView: View {
         }
     }
 
-    private func footer(now: Date) -> some View {
+    private var footer: some View {
         HStack(spacing: 6) {
             Button {
                 Task { await model.refresh() }
@@ -424,11 +439,15 @@ struct PopoverView: View {
             if model.isRefreshing {
                 ProgressView()
                     .controlSize(.small)
-            } else if let freshness = freshness(now: now) {
-                Text(freshness)
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+            } else {
+                ticking { now in
+                    if let freshness = freshness(now: now) {
+                        Text(freshness)
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             Spacer()
             moreMenu
@@ -463,8 +482,8 @@ struct PopoverView: View {
                 set: { updater.updatesAutomatically = $0 }
             ))
             Toggle("Open at Login", isOn: Binding(
-                get: { LoginItem.isEnabled },
-                set: { LoginItem.isEnabled = $0 }
+                get: { LoginItem.shared.isEnabled },
+                set: { LoginItem.shared.setEnabled($0) }
             ))
             Divider()
             if model.isConnected {
@@ -695,5 +714,17 @@ private struct ProjectRow: View {
         return [Format.tokens(project.totalTokens).map { "\($0) tokens" }, date]
             .compactMap { $0 }
             .joined(separator: " · ")
+    }
+}
+
+/// Ticks every second while active. Inactive, it has just the one entry it starts
+/// with, so nothing re-renders while the popover is closed; turning it back on
+/// restarts it from the current time.
+private struct PopoverClock: TimelineSchedule {
+    let isActive: Bool
+
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
+        guard isActive else { return AnyIterator(CollectionOfOne(startDate).makeIterator()) }
+        return AnyIterator(PeriodicTimelineSchedule(from: startDate, by: 1).entries(from: startDate, mode: mode))
     }
 }
