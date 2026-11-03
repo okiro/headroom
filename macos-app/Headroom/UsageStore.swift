@@ -192,16 +192,31 @@ actor UsageStore {
         let recent = all
             .filter { $0.project.lastSeen != nil }
             .sorted { $0.project.lastSeen! > $1.project.lastSeen! }
-            .prefix(3)
+            .prefix(6)
         let top = all
             .sorted { $0.project.cost > $1.project.cost }
-            .prefix(3)
+            .prefix(6)
+
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        let dailySpend = (0..<14).reversed().compactMap { offset -> DailySpend? in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: startOfToday) else { return nil }
+            return DailySpend(date: date, cost: dailyUsage[days.key(for: date)] ?? 0)
+        }
+
+        // Dated snapshots of one model share its display name.
+        let modelSpend = Dictionary(grouping: globalModelBreakdown.filter { $0.value > 0 }) { Format.modelName($0.key) }
+            .map { ModelSpend(name: $0.key, cost: $0.value.reduce(0) { $0 + $1.value }) }
+            .sorted { $0.cost > $1.cost }
 
         return Result(
             summary: UsageSummary(
                 totals: totals,
                 recentProjects: recent.map { $0.project.summary(id: $0.dir) },
-                topProjects: top.map { $0.project.summary(id: $0.dir) }
+                topProjects: top.map { $0.project.summary(id: $0.dir) },
+                projectCount: all.filter { $0.project.cost > 0 }.count,
+                dailySpend: dailySpend,
+                modelSpend: modelSpend
             ),
             fiveHourTokens: fiveHourWindow?.tokens,
             sevenDayTokens: sevenDayWindow?.tokens

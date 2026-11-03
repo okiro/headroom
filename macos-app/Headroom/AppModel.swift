@@ -18,6 +18,8 @@ final class AppModel {
     /// Why the last Connect failed; shown in place of the "Not connected" hint.
     private(set) var connectError: String?
     private(set) var isRefreshing = false
+    /// When the local usage scan last finished.
+    private(set) var updatedAt: Date?
 
     let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 
@@ -157,6 +159,7 @@ final class AppModel {
             usage = result.summary
             fiveHourTokens = result.fiveHourTokens
             sevenDayTokens = result.sevenDayTokens
+            updatedAt = Date()
             dataRefresh = nil
         }
         dataRefresh = task

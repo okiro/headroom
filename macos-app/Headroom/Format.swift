@@ -10,11 +10,12 @@ enum Format {
         return value.formatted(.currency(code: "USD").locale(usLocale).precision(.fractionLength(digits)))
     }
 
-    /// "1.2m", "340k"; nil for zero so empty counts stay hidden.
+    /// "2.0B", "1.2M", "340k"; nil for zero so empty counts stay hidden.
     static func tokens(_ value: Int?) -> String? {
         guard let value, value > 0 else { return nil }
         let n = Double(value)
-        if n >= 1e6 { return String(format: "%.1fm", n / 1e6) }
+        if n >= 1e9 { return String(format: "%.1fB", n / 1e9) }
+        if n >= 1e6 { return String(format: "%.1fM", n / 1e6) }
         if n >= 1e3 { return String(format: "%.0fk", n / 1e3) }
         return String(value)
     }
@@ -44,7 +45,27 @@ enum Format {
     /// "12s ago", "3m ago"
     static func ago(_ date: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date).rounded()))
-        return seconds < 60 ? "\(seconds)s ago" : "\(Int((Double(seconds) / 60).rounded()))m ago"
+        if seconds < 60 { return "\(seconds)s ago" }
+        if seconds < 3600 { return "\(seconds / 60)m ago" }
+        return "\(seconds / 3600)h ago"
+    }
+
+    /// "just now", "5m ago", "3h ago", then "Oct 19".
+    static func lastActive(_ date: Date, now: Date) -> String {
+        let seconds = now.timeIntervalSince(date)
+        if seconds < 60 { return "just now" }
+        if seconds < 24 * 3600 { return ago(date, now: now) }
+        return shortDate(date) ?? ""
+    }
+
+    /// "claude-opus-5-5" → "Opus 5.5", "claude-3-5-sonnet-20241022" → "Sonnet 3.5".
+    static func modelName(_ id: String) -> String {
+        var parts = id.split(separator: "-").map(String.init)
+        if parts.first == "claude" { parts.removeFirst() }
+        if let last = parts.last, last.count == 8, last.allSatisfy(\.isNumber) { parts.removeLast() }
+        let words = parts.filter { !$0.allSatisfy(\.isNumber) }.map(\.capitalized)
+        let version = parts.filter { $0.allSatisfy(\.isNumber) }.joined(separator: ".")
+        return (words + (version.isEmpty ? [] : [version])).joined(separator: " ")
     }
 }
 

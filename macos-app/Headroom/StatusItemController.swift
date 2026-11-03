@@ -120,15 +120,25 @@ final class StatusItemController: NSObject {
 
     private func showMenu() {
         closePopover()
+        // Mirrors the popover's ⋯ menu.
         let menu = NSMenu()
-        menu.addItem(withTitle: "Refresh", action: #selector(refreshFromMenu), keyEquivalent: "r").target = self
+        menu.addItem(withTitle: "Headroom \(model.appVersion)", action: nil, keyEquivalent: "").isEnabled = false
         menu.addItem(.separator())
         menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
         let autoUpdate = menu.addItem(withTitle: "Update Automatically", action: #selector(toggleAutomaticUpdates), keyEquivalent: "")
         autoUpdate.target = self
         autoUpdate.state = updater.updatesAutomatically ? .on : .off
+        let openAtLogin = menu.addItem(withTitle: "Open at Login", action: #selector(toggleOpenAtLogin), keyEquivalent: "")
+        openAtLogin.target = self
+        openAtLogin.state = LoginItem.isEnabled ? .on : .off
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Refresh", action: #selector(refreshFromMenu), keyEquivalent: "r").target = self
+        menu.addItem(
+            withTitle: model.isConnected ? "Disconnect from Claude Code" : "Connect to Claude Code",
+            action: #selector(toggleConnection), keyEquivalent: ""
+        ).target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit Headroom", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         // Attached only for this click so a left click still opens the popover.
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
@@ -145,5 +155,19 @@ final class StatusItemController: NSObject {
 
     @objc private func toggleAutomaticUpdates() {
         updater.updatesAutomatically.toggle()
+    }
+
+    @objc private func toggleOpenAtLogin() {
+        LoginItem.isEnabled.toggle()
+    }
+
+    @objc private func toggleConnection() {
+        Task {
+            if model.isConnected {
+                await model.disconnect()
+            } else {
+                await model.connect()
+            }
+        }
     }
 }

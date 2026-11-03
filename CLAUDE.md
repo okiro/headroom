@@ -19,6 +19,7 @@ Native menu bar app (no Dock icon, no main window): AppKit `NSStatusItem` + `NSP
 - `CredentialStore.swift` — keychain import; `RateLimitClient.swift` — rate-limit header probe
 - `StatusItemController.swift` — menu bar item, popover show/dismiss, right-click menu
 - `Updater.swift` — Sparkle; installs downloaded updates immediately, or when the popover closes
+- `LoginItem.swift` — Open at Login via `SMAppService.mainApp`
 - `PopoverView.swift` — the popover UI
 
 ## Data Flow

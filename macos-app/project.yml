@@ -8,7 +8,7 @@ settings:
     DEVELOPMENT_TEAM: W898QUYB63
     # Development defaults; build.sh sets both to the release version (Sparkle compares
     # CFBundleVersion with the appcast's sparkle:version)
-    MARKETING_VERSION: "2.0.3"
+    MARKETING_VERSION: "2.0.4"
     CURRENT_PROJECT_VERSION: "2.0.1"
     SWIFT_VERSION: "6.0"
 packages:
