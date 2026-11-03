@@ -16,6 +16,10 @@
   <sub>Free · macOS 14 Sonoma or later · Apple silicon and Intel</sub>
 </p>
 
+<p align="center">
+  <img src="docs/screenshot.png" width="392" alt="The Headroom dashboard: 64% of the 7-day limit left with a reset countdown, today's, this month's and all-time spend, a 14-day spend chart and spend by model">
+</p>
+
 ---
 
 You're deep in a Claude Code session when it stops: you've hit your 5-hour limit, with no warning. Or you wonder how much this month's work would have cost at API prices, and there's no easy way to find out.
