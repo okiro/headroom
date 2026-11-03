@@ -2,6 +2,8 @@ import Foundation
 
 /// Turns Claude Code's JSONL transcripts in ~/.claude/projects into cost and token
 /// totals, merged with a persisted history so usage from deleted sessions survives.
+/// Subagent transcripts (<session>/subagents/agent-*.jsonl) are included: their
+/// responses appear nowhere else.
 ///
 /// Parsed entries are cached per file, keyed by modification date and size, so a
 /// refresh only re-reads transcripts that changed since the previous one.
@@ -67,8 +69,10 @@ actor UsageStore {
         let projectDirs = topLevel.filter { isDirectory(projectsDir.appending(path: $0).path(percentEncoded: false)) }.sorted()
 
         for dir in projectDirs {
-            let projectDir = projectsDir.appending(path: dir, directoryHint: .isDirectory)
-            guard let names = try? fm.contentsOfDirectory(atPath: projectDir.path(percentEncoded: false)) else { continue }
+            let projectDir = projectsDir.appending(path: dir, directoryHint: .isDirectory).path(percentEncoded: false)
+            // Recursive, for subagent transcripts. Sorted, so a session's own file
+            // ("<id>.jsonl") comes before its "<id>/subagents/…" files.
+            guard let names = fm.subpaths(atPath: projectDir) else { continue }
 
             let resolvedPath = resolveProjectPath(dir)
             var project = Project(name: Self.shortName(resolvedPath), fullPath: resolvedPath)
@@ -80,7 +84,7 @@ actor UsageStore {
             var recordedCwd: String?
 
             for name in names.filter({ $0.hasSuffix(".jsonl") }).sorted() {
-                let path = projectDir.appending(path: name).path(percentEncoded: false)
+                let path = (projectDir as NSString).appendingPathComponent(name)
                 guard let file = parsedFile(at: path) else { continue }
                 livePaths.insert(path)
                 if recordedCwd == nil { recordedCwd = file.cwd }
@@ -233,8 +237,7 @@ actor UsageStore {
         if let cached = parsedFiles[path], cached.modified == modified, cached.size == size {
             return cached
         }
-        guard let data = FileManager.default.contents(atPath: path) else { return nil }
-        let parsed = Self.parse(data, modified: modified, size: size)
+        guard let parsed = Self.parse(path: path, modified: modified, size: size) else { return nil }
         parsedFiles[path] = parsed
         return parsed
     }
@@ -242,28 +245,75 @@ actor UsageStore {
     private static let assistantNeedle = Array(#""assistant""#.utf8)
     private static let cwdNeedle = Array(#""cwd""#.utf8)
 
-    private static func parse(_ data: Data, modified: Date, size: Int) -> ParsedFile {
+    /// Reads in chunks through one buffer rather than loading the file whole.
+    /// Transcripts reach ~100 MB, and malloc keeps freed buffers that large dirty, so
+    /// whole-file reads left a few hundred MB in the footprint after every scan.
+    private static func parse(path: String, modified: Date, size: Int) -> ParsedFile? {
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }
+
+        var lines = LineParser()
+        var capacity = 1 << 20
+        var buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
+        defer { buffer.deallocate() }
+        var filled = 0
+
+        while true {
+            // The buffer holds only an unfinished line: grow it to fit a longer one.
+            if filled == capacity {
+                capacity *= 2
+                let grown = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
+                grown.copyMemory(from: buffer, byteCount: filled)
+                buffer.deallocate()
+                buffer = grown
+            }
+            let count = read(fd, buffer + filled, capacity - filled)
+            if count < 0 {
+                if errno == EINTR { continue }
+                return nil
+            }
+            if count == 0 { break }
+            let scanFrom = filled
+            filled += count
+
+            // Hand over every complete line, then move the unfinished one to the front.
+            var lineStart = 0
+            var searchFrom = scanFrom
+            while let newline = memchr(buffer + searchFrom, 0x0A, filled - searchFrom) {
+                let end = newline - buffer
+                lines.consume(buffer + lineStart, length: end - lineStart)
+                lineStart = end + 1
+                searchFrom = lineStart
+            }
+            if lineStart > 0 {
+                memmove(buffer, buffer + lineStart, filled - lineStart)
+                filled -= lineStart
+            }
+        }
+        // A last line without a trailing newline.
+        lines.consume(buffer, length: filled)
+
+        return ParsedFile(modified: modified, size: size, entries: lines.entries, cwd: lines.cwd)
+    }
+
+    private struct LineParser {
         var entries: [Entry] = []
         var cwd: String?
 
-        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
-            guard let base = buffer.baseAddress else { return }
-            var offset = 0
-            while offset < buffer.count {
-                let lineStart = base + offset
-                let remaining = buffer.count - offset
-                let length = memchr(lineStart, 0x0A, remaining).map { UnsafeRawPointer($0) - lineStart } ?? remaining
-                offset += length + 1
-                guard length > 0 else { continue }
+        mutating func consume(_ start: UnsafeRawPointer, length: Int) {
+            guard length > 0 else { return }
+            // Most lines are user turns and tool results. Only decode the ones that
+            // can hold an assistant entry, or a cwd while the file's is still unknown.
+            let mayBeAssistant = UsageStore.contains(UsageStore.assistantNeedle, in: start, length: length)
+            let mayHaveCwd = cwd == nil && UsageStore.contains(UsageStore.cwdNeedle, in: start, length: length)
+            guard mayBeAssistant || mayHaveCwd else { return }
 
-                // Most lines are user turns and tool results. Only decode the ones that
-                // can hold an assistant entry, or a cwd while the file's is still unknown.
-                let mayBeAssistant = contains(assistantNeedle, in: lineStart, length: length)
-                let mayHaveCwd = cwd == nil && contains(cwdNeedle, in: lineStart, length: length)
-                guard mayBeAssistant || mayHaveCwd else { continue }
-
-                let line = Data(bytes: lineStart, count: length)
-                guard let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] else { continue }
+            // The decoded objects are autoreleased; without a pool per line they all
+            // live until the whole scan returns, which roughly doubled its peak memory.
+            autoreleasepool {
+                let line = Data(bytes: start, count: length)
+                guard let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any] else { return }
                 if cwd == nil, let value = object["cwd"] as? String, value.hasPrefix("/") {
                     cwd = value
                 }
@@ -272,8 +322,6 @@ actor UsageStore {
                 }
             }
         }
-
-        return ParsedFile(modified: modified, size: size, entries: entries, cwd: cwd)
     }
 
     private static func contains(_ needle: [UInt8], in bytes: UnsafeRawPointer, length: Int) -> Bool {
