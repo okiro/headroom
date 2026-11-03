@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PopoverView: View {
     let model: AppModel
+    let updater: Updater
     @State private var showsErrors = false
 
     var body: some View {
@@ -17,6 +18,12 @@ struct PopoverView: View {
                 projectList("Top Projects", model.usage?.topProjects, date: \.firstSeen)
             }
             .padding(16)
+            if let version = updater.pendingVersion {
+                Divider()
+                updateBanner(version: version)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+            }
             if !model.errors.isEmpty {
                 Divider()
                 errorList
@@ -165,7 +172,20 @@ struct PopoverView: View {
         }
     }
 
-    // ─── Errors and footer ──────────────────────────────────────────────────────
+    // ─── Update, errors and footer ──────────────────────────────────────────────
+
+    private func updateBanner(version: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundStyle(Color.accentColor)
+            Text("Version \(version) is available")
+                .font(.caption)
+            Spacer(minLength: 0)
+            Button("Update") { updater.checkForUpdates() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+        }
+    }
 
     private var errorList: some View {
         DisclosureGroup(isExpanded: $showsErrors) {

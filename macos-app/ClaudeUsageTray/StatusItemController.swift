@@ -6,16 +6,18 @@ import SwiftUI
 @MainActor
 final class StatusItemController: NSObject {
     private let model: AppModel
+    private let updater: Updater
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
     private var outsideClickMonitor: Any?
     private var escapeKeyMonitor: Any?
 
-    init(model: AppModel) {
+    init(model: AppModel, updater: Updater) {
         self.model = model
+        self.updater = updater
         super.init()
 
-        let content = NSHostingController(rootView: PopoverView(model: model))
+        let content = NSHostingController(rootView: PopoverView(model: model, updater: updater))
         content.sizingOptions = .preferredContentSize
         popover.contentViewController = content
         // Dismissal (outside click, app deactivation, Esc) is handled here so that a
@@ -75,6 +77,7 @@ final class StatusItemController: NSObject {
         // bar click, so the app stayed inactive — no Esc, no ⌘R/⌘Q, and no
         // resign-active notification to dismiss the popover on app switch.
         NSApp.activate(ignoringOtherApps: true)
+        updater.holdsInstall = true
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
         // The button clears its highlight when its click tracking ends, after this
@@ -104,6 +107,7 @@ final class StatusItemController: NSObject {
             popover.performClose(nil)
         }
         statusItem.button?.highlight(false)
+        updater.holdsInstall = false
         if let outsideClickMonitor {
             NSEvent.removeMonitor(outsideClickMonitor)
             self.outsideClickMonitor = nil
@@ -119,6 +123,11 @@ final class StatusItemController: NSObject {
         let menu = NSMenu()
         menu.addItem(withTitle: "Refresh", action: #selector(refreshFromMenu), keyEquivalent: "r").target = self
         menu.addItem(.separator())
+        menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+        let autoUpdate = menu.addItem(withTitle: "Update Automatically", action: #selector(toggleAutomaticUpdates), keyEquivalent: "")
+        autoUpdate.target = self
+        autoUpdate.state = updater.updatesAutomatically ? .on : .off
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         // Attached only for this click so a left click still opens the popover.
         statusItem.menu = menu
@@ -128,5 +137,13 @@ final class StatusItemController: NSObject {
 
     @objc private func refreshFromMenu() {
         Task { await model.refresh() }
+    }
+
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
+    @objc private func toggleAutomaticUpdates() {
+        updater.updatesAutomatically.toggle()
     }
 }

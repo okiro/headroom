@@ -6,20 +6,30 @@ options:
 settings:
   base:
     DEVELOPMENT_TEAM: W898QUYB63
+    # Development defaults; build.sh sets both to the release version (Sparkle compares
+    # CFBundleVersion with the appcast's sparkle:version)
     MARKETING_VERSION: "2.0.1"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2.0.1"
     SWIFT_VERSION: "6.0"
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.0
 targets:
   ClaudeUsageTray:
     type: application
     platform: macOS
     sources:
       - path: ClaudeUsageTray
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_NAME: Claude Usage Tray
         PRODUCT_BUNDLE_IDENTIFIER: com.claude.usage-tray
         GENERATE_INFOPLIST_FILE: "YES"
+        # Merged into the generated Info.plist: Sparkle's feed and public key
+        INFOPLIST_FILE: Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Claude Usage Tray
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_LSUIElement: "YES"

@@ -6,10 +6,11 @@ cd macos-app
 xcodegen generate  # regenerate the Xcode project (after adding/removing files or editing project.yml)
 open ClaudeUsageTray.xcodeproj
 ./build.sh         # Developer ID-signed universal release in macos-app/dist/
+./release.sh       # notarized DMG + Sparkle appcast in dist/; --publish creates the GitHub release (CI does this on every push to main)
 
 ## Architecture
 
-Native menu bar app (no Dock icon, no main window): AppKit `NSStatusItem` + `NSPopover` hosting SwiftUI. Swift 6 language mode, macOS 14+, no dependencies.
+Native menu bar app (no Dock icon, no main window): AppKit `NSStatusItem` + `NSPopover` hosting SwiftUI. Swift 6 language mode, macOS 14+. One dependency: Sparkle (SwiftPM, for auto-update).
 
 - `AppDelegate.swift` — entry point; creates the model and the status item
 - `AppModel.swift` — `@Observable` state, refresh timers (60s usage, 15m rate limits), coalesced fetches, disk cache
@@ -17,6 +18,7 @@ Native menu bar app (no Dock icon, no main window): AppKit `NSStatusItem` + `NSP
 - `Pricing.swift` — per-model prices
 - `CredentialStore.swift` — keychain import; `RateLimitClient.swift` — rate-limit header probe
 - `StatusItemController.swift` — menu bar item, popover show/dismiss, right-click menu
+- `Updater.swift` — Sparkle; installs downloaded updates immediately, or when the popover closes
 - `PopoverView.swift` — the popover UI
 
 ## Data Flow
@@ -34,9 +36,12 @@ Native menu bar app (no Dock icon, no main window): AppKit `NSStatusItem` + `NSP
 - The OAuth token is never written to disk; only a `connected` flag in UserDefaults persists
 - Read Claude Code's keychain item through `/usr/bin/security`, not `SecItem` — the item trusts that tool, so there is no access prompt
 - The popover uses `.applicationDefined` behavior with its own dismissal, and opens with `activate(ignoringOtherApps:)` — the cooperative `activate()` leaves the app inactive after a menu bar click
+- Releases are versioned from commit messages since the last `v*` tag (`feat:` → minor, `feat!:` → major, anything else → patch); every push to main touching `macos-app/` publishes one
+- Sparkle compares `CFBundleVersion`, so `build.sh` sets both it and `MARKETING_VERSION` to the release version; the values in `project.yml` are only development defaults
+- `macos-app/Info.plist` holds only Sparkle keys and is merged into the generated plist; it shares Vigil's Sparkle EdDSA key (the login keychain's default `generate_keys` item)
 - The former Electron app used the same bundle ID (`com.claude.usage-tray`): quit an installed copy before launching this one
 
 ## Code Style
 
-- Plain Swift and SwiftUI; no third-party packages
+- Plain Swift and SwiftUI; no third-party packages beyond Sparkle
 - Strict concurrency: UI types are `@MainActor`, file and network work runs in actors or off the main thread

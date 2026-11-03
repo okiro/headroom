@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Sparkle checks the appcast attached to the latest release of this (public) repo. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/okiro/claudeTray/releases/latest/download/appcast.xml</string>
+	<!-- Public half of the EdDSA key in the login keychain (generate_keys); release.sh signs with the private half. -->
+	<key>SUPublicEDKey</key>
+	<string>KBIGExn4kVi7XAuit1+sqwRzhKfQZMyIMebDHgFqgzA=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+</dict>
+</plist>
