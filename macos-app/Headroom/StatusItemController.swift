@@ -51,7 +51,11 @@ final class StatusItemController: NSObject {
 
     private func updateButton() {
         guard let button = statusItem.button else { return }
-        let utilization = model.rateLimits.map { $0.fiveHourUtil.isFinite ? $0.fiveHourUtil : 0 }
+        // The 5-hour window, or the 7-day one on plans without a 5-hour limit.
+        let utilization = model.rateLimits.map { limits in
+            let value = limits.fiveHourUtil ?? limits.sevenDayUtil
+            return value.isFinite ? value : 0
+        }
         button.image = GaugeIcon.image(fill: utilization ?? 0)
         button.title = utilization.map { " \(Int(($0 * 100).rounded()))%" } ?? " —"
     }

@@ -100,13 +100,24 @@ struct PopoverView: View {
         if model.isConnected, model.rateLimitError == nil, let limits = model.rateLimits {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    sectionTitle("5-hour window")
+                    sectionTitle(limits.fiveHourUtil == nil ? "7-day window" : "5-hour window")
                     Spacer()
                     peakHours(now: now)
                 }
-                fiveHour(limits, now: now)
-                sevenDay(limits, now: now)
-                    .padding(.top, 4)
+                if let fiveHourUtil = limits.fiveHourUtil {
+                    window(
+                        utilization: fiveHourUtil, reset: limits.fiveHourReset,
+                        tokens: model.fiveHourTokens, name: "5-hour", now: now
+                    )
+                    sevenDay(limits, now: now)
+                        .padding(.top, 4)
+                } else {
+                    // No 5-hour limit (Ultra): the 7-day window is the headline.
+                    window(
+                        utilization: limits.sevenDayUtil, reset: limits.sevenDayReset,
+                        tokens: model.sevenDayTokens, name: "7-day", now: now
+                    )
+                }
                 if limits.overageUtil != 0 {
                     HStack(spacing: 6) {
                         Text("OVERAGE")
@@ -139,8 +150,10 @@ struct PopoverView: View {
         }
     }
 
-    private func fiveHour(_ limits: RateLimits, now: Date) -> some View {
-        let left = Headroom(utilization: limits.fiveHourUtil)
+    private func window(
+        utilization: Double, reset: Double?, tokens: WindowTokens?, name: String, now: Date
+    ) -> some View {
+        let left = Headroom(utilization: utilization)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .bottom) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -154,12 +167,12 @@ struct PopoverView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
-                    if let reset = Self.resetText(limits.fiveHourReset, now: now) {
+                    if let reset = Self.resetText(reset, now: now) {
                         Text(reset)
                             .font(.caption.weight(.medium))
                             .monospacedDigit()
                     }
-                    if let tokens = Format.tokens(model.fiveHourTokens?.total) {
+                    if let tokens = Format.tokens(tokens?.total) {
                         Text("\(tokens) tokens used")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -167,7 +180,7 @@ struct PopoverView: View {
                 }
             }
             HeadroomBar(headroom: left, height: 8)
-                .accessibilityLabel("\(left.percent) percent of the 5-hour window left")
+                .accessibilityLabel("\(left.percent) percent of the \(name) window left")
         }
     }
 

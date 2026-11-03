@@ -4,7 +4,18 @@ import OSLog
 struct Credentials: Sendable {
     let accessToken: String
     let expiresAt: Date
-    let subscriptionType: String?
+    /// Lowercase plan name, e.g. "pro", "max" or "ultra".
+    let plan: String?
+
+    /// `subscriptionType` is "max" for both $100 and $200 plans; only `rateLimitTier`
+    /// (e.g. "default_claude_max_20x") tells them apart. The 20x tier is sold as Ultra.
+    static func planName(subscriptionType: String?, rateLimitTier: String?) -> String? {
+        if let tier = rateLimitTier?.lowercased() {
+            if tier.contains("max_20x") { return "ultra" }
+            if tier.contains("max_5x") { return "max" }
+        }
+        return subscriptionType
+    }
 }
 
 enum AuthError: LocalizedError {
@@ -66,7 +77,10 @@ actor CredentialStore {
         cached = Credentials(
             accessToken: token,
             expiresAt: Date(timeIntervalSince1970: expiresAtMs / 1000),
-            subscriptionType: oauth["subscriptionType"] as? String
+            plan: Credentials.planName(
+                subscriptionType: oauth["subscriptionType"] as? String,
+                rateLimitTier: oauth["rateLimitTier"] as? String
+            )
         )
         UserDefaults.standard.set(true, forKey: Self.connectedKey)
         return true

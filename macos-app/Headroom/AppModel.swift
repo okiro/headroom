@@ -70,7 +70,7 @@ final class AppModel {
         connectError = nil
         do {
             let creds = try await credentials.login()
-            plan = creds.subscriptionType
+            plan = creds.plan
             isConnected = true
             await refreshAll()
         } catch {
@@ -123,8 +123,8 @@ final class AppModel {
         case .limits(let limits):
             rateLimits = limits
             rateLimitError = nil
-            if let subscription = await credentials.current?.subscriptionType {
-                plan = subscription
+            if let current = await credentials.current?.plan {
+                plan = current
             }
         case .unauthorized:
             log.info("API returned 401, re-importing from keychain")

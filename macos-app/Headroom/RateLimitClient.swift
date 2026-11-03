@@ -51,7 +51,7 @@ enum RateLimitClient {
 
         return .limits(RateLimits(
             status: header("status").flatMap { $0.isEmpty ? nil : $0 } ?? "unknown",
-            fiveHourUtil: number(header("5h-utilization")) ?? 0,
+            fiveHourUtil: number(header("5h-utilization")),
             fiveHourReset: number(header("5h-reset")),
             sevenDayUtil: number(header("7d-utilization")) ?? 0,
             sevenDayReset: number(header("7d-reset")),

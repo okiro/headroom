@@ -3,7 +3,8 @@ import Foundation
 /// Utilisation read from the `anthropic-ratelimit-unified-*` response headers.
 struct RateLimits: Codable, Equatable, Sendable {
     var status: String
-    var fiveHourUtil: Double
+    /// Nil when the plan has no 5-hour limit (Ultra): the API then sends no `5h-*` headers.
+    var fiveHourUtil: Double?
     /// Epoch seconds at which the 5-hour window resets.
     var fiveHourReset: Double?
     var sevenDayUtil: Double
