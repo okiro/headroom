@@ -18,6 +18,9 @@ actor UsageStore {
     ///     also holds usage whose transcripts are gone (see HistoryV2Correction).
     static let historyVersion = 3
 
+    /// A pause between two replies longer than this is a break, not working time.
+    static let idleCutoff: TimeInterval = 15 * 60
+
     struct Result: Sendable {
         var summary: UsageSummary
         var fiveHourTokens: WindowTokens?
@@ -77,6 +80,9 @@ actor UsageStore {
             let resolvedPath = resolveProjectPath(dir)
             var project = Project(name: Self.shortName(resolvedPath), fullPath: resolvedPath)
             var sessions = Set<String>()
+            // Reply times from every session and subagent, merged into one timeline so
+            // parallel work counts once.
+            var replyTimes: [Date] = []
             // Claude Code records the real working directory on its entries. That is
             // the only unambiguous source for the project path — the directory name
             // encodes "/" as "-", so "beply.io-vps" and "beply.io/vps" are identical
@@ -106,6 +112,7 @@ actor UsageStore {
                     if let ts = entry.timestamp {
                         if project.firstSeen.map({ ts < $0 }) ?? true { project.firstSeen = ts }
                         if project.lastSeen.map({ ts > $0 }) ?? true { project.lastSeen = ts }
+                        replyTimes.append(ts)
                         let day = days.key(for: ts)
                         project.dailyCost[day, default: 0] += entry.cost
                         dailyUsage[day, default: 0] += entry.cost
@@ -128,6 +135,7 @@ actor UsageStore {
             }
 
             project.sessions = sessions.count
+            project.dailyActive = Self.activeTime(replyTimes, days: &days)
             if let recordedCwd {
                 project.fullPath = recordedCwd
                 project.name = Self.shortName(recordedCwd)
@@ -148,6 +156,7 @@ actor UsageStore {
             if var project = projects[dir] {
                 Self.mergeMax(&project.dailyCost, saved.dailyCost)
                 Self.mergeMax(&project.modelBreakdown, saved.modelBreakdown)
+                Self.mergeMax(&project.dailyActive, saved.dailyActive)
                 project.inputTokens = max(project.inputTokens, saved.inputTokens)
                 project.outputTokens = max(project.outputTokens, saved.outputTokens)
                 project.cacheRead = max(project.cacheRead, saved.cacheRead)
@@ -168,6 +177,7 @@ actor UsageStore {
         }
         for dir in order {
             projects[dir]!.cost = projects[dir]!.dailyCost.values.reduce(0, +)
+            projects[dir]!.activeSeconds = projects[dir]!.dailyActive.values.reduce(0, +)
         }
 
         var updated = History()
@@ -200,6 +210,10 @@ actor UsageStore {
         let top = all
             .sorted { $0.project.cost > $1.project.cost }
             .prefix(6)
+        let mostTime = all
+            .filter { $0.project.activeSeconds > 0 }
+            .sorted { $0.project.activeSeconds > $1.project.activeSeconds }
+            .prefix(6)
 
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: now)
@@ -218,6 +232,7 @@ actor UsageStore {
                 totals: totals,
                 recentProjects: recent.map { $0.project.summary(id: $0.dir) },
                 topProjects: top.map { $0.project.summary(id: $0.dir) },
+                mostTimeProjects: mostTime.map { $0.project.summary(id: $0.dir) },
                 projectCount: all.filter { $0.project.cost > 0 }.count,
                 dailySpend: dailySpend,
                 modelSpend: modelSpend
@@ -390,6 +405,20 @@ actor UsageStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         guard let data = try? encoder.encode(history) else { return }
         try? data.write(to: historyURL, options: .atomic)
+    }
+
+    /// Active seconds per local day: every gap between consecutive replies up to
+    /// `idleCutoff`, credited to the day of the later reply.
+    private static func activeTime(_ times: [Date], days: inout DayKeys) -> [String: Double] {
+        var daily: [String: Double] = [:]
+        let sorted = times.sorted()
+        for (previous, next) in zip(sorted, sorted.dropFirst()) {
+            let gap = next.timeIntervalSince(previous)
+            if gap > 0, gap <= idleCutoff {
+                daily[days.key(for: next), default: 0] += gap
+            }
+        }
+        return daily
     }
 
     private static func mergeMax(_ target: inout [String: Double], _ source: [String: Double]) {
@@ -582,6 +611,9 @@ private struct Project {
     var lastSeen: Date?
     var dailyCost: [String: Double] = [:]
     var modelBreakdown: [String: Double] = [:]
+    /// Seconds of active time per local day; see `UsageStore.activeTime`.
+    var dailyActive: [String: Double] = [:]
+    var activeSeconds = 0.0
 
     init(name: String, fullPath: String) {
         self.name = name
@@ -600,10 +632,14 @@ private struct Project {
         lastSeen = saved.lastSeen.flatMap(UsageStore.parseDate)
         dailyCost = saved.dailyCost
         modelBreakdown = saved.modelBreakdown
+        dailyActive = saved.dailyActive
     }
 
     func summary(id: String) -> ProjectSummary {
-        ProjectSummary(id: id, name: name, cost: cost, firstSeen: firstSeen, lastSeen: lastSeen, totalTokens: inputTokens + outputTokens)
+        ProjectSummary(
+            id: id, name: name, cost: cost, firstSeen: firstSeen, lastSeen: lastSeen,
+            totalTokens: inputTokens + outputTokens, activeSeconds: activeSeconds
+        )
     }
 }
 
@@ -633,6 +669,8 @@ private struct HistoryProject: Codable {
     var fullPath: String?
     var dailyCost: [String: Double] = [:]
     var modelBreakdown: [String: Double] = [:]
+    /// Absent from files written before active time was tracked.
+    var dailyActive: [String: Double] = [:]
     var inputTokens = 0
     var outputTokens = 0
     var cacheRead = 0
@@ -646,6 +684,7 @@ private struct HistoryProject: Codable {
         fullPath = project.fullPath
         dailyCost = project.dailyCost
         modelBreakdown = project.modelBreakdown
+        dailyActive = project.dailyActive
         inputTokens = project.inputTokens
         outputTokens = project.outputTokens
         cacheRead = project.cacheRead
@@ -663,6 +702,7 @@ private struct HistoryProject: Codable {
         fullPath = try? c.decodeIfPresent(String.self, forKey: .fullPath)
         dailyCost = c.numberMap(.dailyCost)
         modelBreakdown = c.numberMap(.modelBreakdown)
+        dailyActive = c.numberMap(.dailyActive)
         inputTokens = c.integer(.inputTokens)
         outputTokens = c.integer(.outputTokens)
         cacheRead = c.integer(.cacheRead)

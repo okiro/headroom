@@ -5,11 +5,15 @@ struct PopoverView: View {
     let updater: Updater
     let presentation: PopoverPresentation
     @State private var showsErrors = false
-    @AppStorage("showsTopProjects") private var showsTopProjects = false
+    @AppStorage("projectSort") private var projectSort = ProjectSort.recent
     @AppStorage("popoverTab") private var tab = Tab.spend
 
     private enum Tab: String {
         case spend, projects
+    }
+
+    enum ProjectSort: String {
+        case recent, cost, time
     }
 
     var body: some View {
@@ -350,8 +354,14 @@ struct PopoverView: View {
     // ─── Projects ───────────────────────────────────────────────────────────────
 
     private var projects: some View {
-        let projects = showsTopProjects ? model.usage?.topProjects : model.usage?.recentProjects
-        let largest = projects?.map(\.cost).max() ?? 0
+        let projects = switch projectSort {
+        case .recent: model.usage?.recentProjects
+        case .cost: model.usage?.topProjects
+        case .time: model.usage?.mostTimeProjects
+        }
+        // The bar compares what the list is sorted by; recent projects compare cost.
+        let metric: (ProjectSummary) -> Double = projectSort == .time ? { $0.activeSeconds } : { $0.cost }
+        let largest = projects?.map(metric).max() ?? 0
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 if let projects, let count = model.usage?.projectCount, count > projects.count {
@@ -360,9 +370,10 @@ struct PopoverView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Picker("Projects", selection: $showsTopProjects) {
-                    Text("Recent").tag(false)
-                    Text("Top").tag(true)
+                Picker("Projects", selection: $projectSort) {
+                    Text("Recent").tag(ProjectSort.recent)
+                    Text("Cost").tag(ProjectSort.cost)
+                    Text("Time").tag(ProjectSort.time)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -372,7 +383,7 @@ struct PopoverView: View {
             if let projects, !projects.isEmpty {
                 ticking { now in
                     ForEach(projects) { project in
-                        ProjectRow(project: project, share: largest > 0 ? project.cost / largest : 0, showsTop: showsTopProjects, now: now)
+                        ProjectRow(project: project, share: largest > 0 ? metric(project) / largest : 0, sort: projectSort, now: now)
                     }
                 }
             } else {
@@ -666,10 +677,10 @@ private struct ModelList: View {
 
 private struct ProjectRow: View {
     let project: ProjectSummary
-    /// Cost relative to the most expensive project in the list, 0...1.
+    /// The sorted-by value relative to the list's largest, 0...1.
     let share: Double
-    /// Top projects show when they started, recent ones when they were last active.
-    let showsTop: Bool
+    /// Recent projects show when they were last active, the others when they started.
+    let sort: PopoverView.ProjectSort
     let now: Date
 
     var body: some View {
@@ -688,9 +699,20 @@ private struct ProjectRow: View {
                     }
                 }
                 Spacer(minLength: 4)
-                Text(Format.cost(project.cost))
-                    .font(.callout.weight(.medium))
-                    .monospacedDigit()
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(Format.cost(project.cost))
+                        .font(.callout.weight(.medium))
+                        .monospacedDigit()
+                    if let time {
+                        Text(time)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .help(timeHelp)
+                    }
+                }
+                .fixedSize()
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -707,8 +729,24 @@ private struct ProjectRow: View {
         .padding(.vertical, 2)
     }
 
+    /// Active time and the calendar span it fell in: "38h 20m in 26d".
+    private var time: String? {
+        guard project.activeSeconds > 0 else { return nil }
+        let active = Format.duration(project.activeSeconds)
+        guard let first = project.firstSeen, let last = project.lastSeen else { return active }
+        return "\(active) in \(Format.span(from: first, to: last))"
+    }
+
+    private var timeHelp: String {
+        let active = Format.duration(project.activeSeconds)
+        guard let first = Format.shortDate(project.firstSeen), let last = Format.shortDate(project.lastSeen) else {
+            return "\(active) of active time"
+        }
+        return "\(active) of active time between \(first) and \(last)"
+    }
+
     private var detail: String {
-        let date = showsTop
+        let date = sort != .recent
             ? project.firstSeen.flatMap(Format.shortDate).map { "since \($0)" }
             : project.lastSeen.map { "active \(Format.lastActive($0, now: now))" }
         return [Format.tokens(project.totalTokens).map { "\($0) tokens" }, date]

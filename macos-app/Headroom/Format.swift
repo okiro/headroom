@@ -42,6 +42,23 @@ enum Format {
         return "\(minutes)m"
     }
 
+    /// Time worked: "38h 20m", "45m", "<1m", and whole hours from 100h ("142h").
+    static func duration(_ seconds: Double) -> String {
+        let minutes = Int(seconds / 60)
+        let hours = minutes / 60
+        if hours >= 100 { return "\(hours)h" }
+        if hours > 0 { return "\(hours)h \(minutes % 60)m" }
+        return minutes > 0 ? "\(minutes)m" : "<1m"
+    }
+
+    /// Calendar time between two dates: "26d", "5h", "40m".
+    static func span(from start: Date, to end: Date) -> String {
+        let seconds = max(0, end.timeIntervalSince(start))
+        if seconds >= 24 * 3600 { return "\(Int(seconds / (24 * 3600)))d" }
+        if seconds >= 3600 { return "\(Int(seconds / 3600))h" }
+        return "\(max(1, Int(seconds / 60)))m"
+    }
+
     /// "12s ago", "3m ago"
     static func ago(_ date: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date).rounded()))

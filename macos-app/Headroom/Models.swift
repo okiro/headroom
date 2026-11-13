@@ -50,6 +50,22 @@ struct ProjectSummary: Codable, Equatable, Identifiable, Sendable {
     var firstSeen: Date?
     var lastSeen: Date?
     var totalTokens: Int
+    /// Time spent working in the project; see `UsageStore.idleCutoff`.
+    var activeSeconds = 0.0
+}
+
+extension ProjectSummary {
+    /// Tolerates a dashboard cache written before `activeSeconds` existed.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        cost = try container.decode(Double.self, forKey: .cost)
+        firstSeen = try container.decodeIfPresent(Date.self, forKey: .firstSeen)
+        lastSeen = try container.decodeIfPresent(Date.self, forKey: .lastSeen)
+        totalTokens = try container.decode(Int.self, forKey: .totalTokens)
+        activeSeconds = try container.decodeIfPresent(Double.self, forKey: .activeSeconds) ?? 0
+    }
 }
 
 /// One local calendar day of spend, for the popover's bar chart.
@@ -73,6 +89,7 @@ struct UsageSummary: Codable, Equatable, Sendable {
     var totals = UsageTotals()
     var recentProjects: [ProjectSummary] = []
     var topProjects: [ProjectSummary] = []
+    var mostTimeProjects: [ProjectSummary] = []
     /// Every project with any spend, of which the two lists show the first few.
     var projectCount = 0
     /// The last 14 days, oldest first, today last; days without usage are zero.
@@ -82,13 +99,14 @@ struct UsageSummary: Codable, Equatable, Sendable {
 }
 
 extension UsageSummary {
-    /// Tolerates a dashboard cache written before `projectCount`, `dailySpend` and
-    /// `modelSpend` existed.
+    /// Tolerates a dashboard cache written before `projectCount`, `dailySpend`,
+    /// `modelSpend` and `mostTimeProjects` existed.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         totals = try container.decode(UsageTotals.self, forKey: .totals)
         recentProjects = try container.decode([ProjectSummary].self, forKey: .recentProjects)
         topProjects = try container.decode([ProjectSummary].self, forKey: .topProjects)
+        mostTimeProjects = try container.decodeIfPresent([ProjectSummary].self, forKey: .mostTimeProjects) ?? []
         projectCount = try container.decodeIfPresent(Int.self, forKey: .projectCount) ?? 0
         dailySpend = try container.decodeIfPresent([DailySpend].self, forKey: .dailySpend) ?? []
         modelSpend = try container.decodeIfPresent([ModelSpend].self, forKey: .modelSpend) ?? []
